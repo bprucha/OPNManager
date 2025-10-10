@@ -65,10 +65,10 @@
             }
           }
           
-          dnsblLists = dnsbl.lists || [];
-          whitelists = dnsbl.whitelists || [];
-          blocklists = dnsbl.blocklists || [];
-          wildcards = dnsbl.wildcards || [];
+          dnsblLists = listToArray(dnsbl.lists);
+          whitelists = listToArray(dnsbl.whitelists);
+          blocklists = listToArray(dnsbl.blocklists);
+          wildcards = listToArray(dnsbl.wildcards);
           dnsblAddress = dnsbl.address || "";
           nxdomain = dnsbl.nxdomain === "1";
         }
@@ -167,6 +167,19 @@
       }
     }
   
+    function listToArray(list) {
+      if (Array.isArray(list)) return list;
+
+      if (!list || typeof list !== "object" || list[""]) return [];
+
+      let arr = [];
+      for (const key in list) {
+        arr.push(key);
+      }
+
+      return arr;
+    }
+
     function parseTextToArray(text) {
       if (!text) return [];
       return text.split('\n')
