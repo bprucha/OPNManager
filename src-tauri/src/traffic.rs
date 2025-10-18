@@ -14,6 +14,31 @@ pub struct InterfaceTraffic {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct InterfaceTopData {
+    pub records: Vec<InterfaceTopRecord>,
+    pub status: String,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct InterfaceTopRecord {
+    pub address: String,
+    pub rate_bits_in: u64,
+    pub rate_bits_out: u64,
+    pub rate_bits: u64,
+    pub cumulative_bytes_in: u64,
+    pub cumulative_bytes_out: u64,
+    pub cumulative_bytes: u64,
+    pub tags: Vec<String>,
+    pub rname: String,
+    pub rate_in: String,
+    pub rate_out: String,
+    pub rate: String,
+    pub cumulative_in: String,
+    pub cumulative_out: String,
+    pub cumulative: String
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct InterfaceData {
     pub name: String,
     pub device: String,
@@ -190,6 +215,38 @@ pub async fn get_interface_traffic(
 
     response
         .json::<InterfaceTraffic>()
+        .await
+        .map_err(|e| format!("Failed to parse response: {}", e))
+}
+
+#[tauri::command]
+pub async fn get_interface_top_traffic(
+    database: State<'_, Database>,
+    interfaces: Vec<String>,
+) -> Result<HashMap<String, InterfaceTopData>, String> {
+    let api_info = database
+        .get_default_api_info()
+        .map_err(|e| format!("Failed to get API info: {}", e))?
+        .ok_or_else(|| "API info not found".to_string())?;
+
+    let url = format!(
+        "{}:{}/api/diagnostics/traffic/top/{}",
+        api_info.api_url, api_info.port, interfaces.join(",")
+    );
+
+    let response = make_http_request(
+        "GET",
+        &url,
+        None,
+        None,
+        Some(30),
+        Some(&api_info.api_key),
+        Some(&api_info.api_secret),
+    )
+    .await?;
+
+    response
+        .json::<HashMap<String, InterfaceTopData>>()
         .await
         .map_err(|e| format!("Failed to parse response: {}", e))
 }
