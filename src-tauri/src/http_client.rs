@@ -7,6 +7,16 @@ use reqwest::{
 use serde_json::Value;
 use std::cmp::min;
 use std::time::Duration;
+use once_cell::sync::Lazy;
+
+static GLOBAL_HTTP_CLIENT: Lazy<Client> = Lazy::new(|| {
+    Client::builder()
+        .danger_accept_invalid_certs(true)
+        .cookie_store(true)
+        .timeout(Duration::from_secs(10))
+        .build()
+        .expect("Failed to build reqwest client")
+});
 
 /// Makes an HTTP request with a JSON payload
 pub async fn make_http_request(
@@ -20,31 +30,18 @@ pub async fn make_http_request(
 ) -> Result<Response, String> {
     info!("Making a {} request to {}", request_type, url);
 
-    let client_builder = Client::builder().danger_accept_invalid_certs(true);
-    let client = if let Some(timeout_sec) = timeout_seconds {
-        client_builder
-            .timeout(Duration::from_secs(timeout_sec))
-            .build()
-    } else {
-        client_builder.build()
-    }
-    .map_err(|e| {
-        let error_message = format!("Failed to build HTTP client: {}", e);
-        error!("{}", error_message);
-        error_message
-    })?;
-
     let mut request_builder = match request_type {
-        "GET" => client.get(url),
-        "POST" => client.post(url),
-        "PATCH" => client.patch(url),
-        "PUT" => client.put(url),
+        "GET" => GLOBAL_HTTP_CLIENT.get(url),
+        "POST" => GLOBAL_HTTP_CLIENT.post(url),
+        "PATCH" => GLOBAL_HTTP_CLIENT.patch(url),
+        "PUT" => GLOBAL_HTTP_CLIENT.put(url),
         _ => {
             let error_message = "Invalid request type".to_string();
             error!("{}", error_message);
             return Err(error_message);
         }
     };
+    request_builder = if let Some(timeout_sec) = timeout_seconds { request_builder.timeout(Duration::from_secs(timeout_sec)) } else { request_builder };
 
     if let (Some(key), Some(secret)) = (api_key, api_secret) {
         let auth_string = format!("{}:{}", key, secret);
@@ -151,31 +148,18 @@ pub async fn make_http_request_with_form_data(
 ) -> Result<Response, String> {
     info!("Making a {} form data request to {}", request_type, url);
 
-    let client_builder = Client::builder().danger_accept_invalid_certs(true);
-    let client = if let Some(timeout_sec) = timeout_seconds {
-        client_builder
-            .timeout(Duration::from_secs(timeout_sec))
-            .build()
-    } else {
-        client_builder.build()
-    }
-    .map_err(|e| {
-        let error_message = format!("Failed to build HTTP client: {}", e);
-        error!("{}", error_message);
-        error_message
-    })?;
-
     let mut request_builder = match request_type {
-        "GET" => client.get(url),
-        "POST" => client.post(url),
-        "PATCH" => client.patch(url),
-        "PUT" => client.put(url),
+        "GET" => GLOBAL_HTTP_CLIENT.get(url),
+        "POST" => GLOBAL_HTTP_CLIENT.post(url),
+        "PATCH" => GLOBAL_HTTP_CLIENT.patch(url),
+        "PUT" => GLOBAL_HTTP_CLIENT.put(url),
         _ => {
             let error_message = "Invalid request type".to_string();
             error!("{}", error_message);
             return Err(error_message);
         }
     };
+    request_builder = if let Some(timeout_sec) = timeout_seconds { request_builder.timeout(Duration::from_secs(timeout_sec)) } else { request_builder };
 
     if let (Some(key), Some(secret)) = (api_key, api_secret) {
         let auth_string = format!("{}:{}", key, secret);
