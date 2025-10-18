@@ -7,6 +7,14 @@ use std::collections::HashMap;
 use tauri::State;
 
 #[derive(Serialize, Deserialize, Debug)]
+pub struct ArpResponse {
+    total: u32,
+    rowCount: u32,
+    current: u32,
+    rows: Vec<Device>,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
 pub struct Device {
     mac: String,
     ip: String,
@@ -73,12 +81,20 @@ pub async fn get_devices(database: State<'_, Database>) -> Result<Vec<Device>, S
         .map_err(|e| format!("Failed to get API info: {}", e))?
         .ok_or_else(|| "API info not found".to_string())?;
 
-    let url = build_api_url(&api_info, "/api/diagnostics/interface/getArp");
+    let url = build_api_url(&api_info, "/api/diagnostics/interface/search_arp");
+
+    let payload = json!({
+        "current": 1,
+        "rowCount": 1000,
+        "sort": {},
+        "searchPhrase": "",
+        "resolve": "yes"
+    });
 
     let response = make_http_request(
-        "GET",
+        "POST",
         &url,
-        None,
+        Some(payload),
         None,
         Some(30),
         Some(&api_info.api_key),
@@ -86,10 +102,11 @@ pub async fn get_devices(database: State<'_, Database>) -> Result<Vec<Device>, S
     )
     .await?;
 
-    response
-        .json::<Vec<Device>>()
+    let arp_response = response
+        .json::<ArpResponse>()
         .await
-        .map_err(|e| format!("Failed to parse response: {}", e))
+        .map_err(|e| format!("Failed to parse response: {}", e))?;
+    Ok(arp_response.rows)
 }
 
 #[tauri::command]
