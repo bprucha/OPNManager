@@ -20,6 +20,7 @@
     mdiGraphOutline,
     mdiServerNetwork,
     mdiTuneVertical,
+    mdiChartLine,
   } from "@mdi/js";
   import { goto } from "$app/navigation";
   import { authStore } from "$lib/stores/authStore";
@@ -48,6 +49,7 @@
 
   const menuItems = [
     { path: "/", icon: mdiHome, label: "Dashboard" },
+    { path: "/traffic", icon: mdiChartLine, label: "Traffic" },
     { path: "/topology", icon: mdiGraphOutline, label: "Network Topology" },
     { path: "/interfaces", icon: mdiEthernet, label: "Interfaces" },
     {
@@ -149,6 +151,12 @@
         }, 50);
       }
     }
+
+    document.documentElement.dispatchEvent(new CustomEvent('onToggleTheme', {
+      detail: {
+        theme: theme,
+      },
+    }));
   }
 
   function isInCategory(category) {

@@ -110,6 +110,7 @@ pub fn run() {
             snapshots::activate_snapshot,
             snapshots::update_snapshot,
             traffic::get_interface_traffic,
+            traffic::get_interface_top_traffic,
             traffic::get_traffic_graph_data,
             traffic::update_traffic_data,
             traffic::clear_traffic_cache,
