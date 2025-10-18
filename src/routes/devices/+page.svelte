@@ -72,7 +72,11 @@
         ipFilter === "" ||
         device.ipv6_addresses.some((ip) => ip.toLowerCase().includes(ipFilter));
 
-      const ipMatch = ipv4Match || ipv6Match;
+      const hostMatch =
+        ipFilter === "" ||
+        device.hostname.toLowerCase().includes(ipFilter);
+
+      const ipMatch = ipv4Match || ipv6Match || hostMatch;
       const macMatch =
         filters.mac.toLowerCase().trim() === "" ||
         device.mac.toLowerCase().includes(filters.mac.toLowerCase().trim());
@@ -149,15 +153,13 @@
         <span class="loading loading-spinner loading-lg"></span>
         <p class="mt-4 text-base-content">Loading devices...</p>
       </div>
-    {:else if filteredDevices.length === 0}
-      <p class="text-base-content">No devices found.</p>
     {:else}
       <!-- Search filters - visible on all screen sizes -->
       <div class="bg-base-100 rounded-lg shadow p-4 mb-4">
         <h3 class="font-bold text-lg mb-3">Filters</h3>
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
-            <label class="text-sm font-medium mb-1 block">IP Address</label>
+            <label class="text-sm font-medium mb-1 block">IP Address / Host</label>
             <div class="flex items-center bg-base-200 rounded-md px-3 py-2">
               <svg
                 class="w-5 h-5 mr-2 text-base-content opacity-70"
@@ -167,7 +169,7 @@
               </svg>
               <input
                 type="text"
-                placeholder="Filter by IPv4 or IPv6"
+                placeholder="Filter by IPv4/6 or Hostname"
                 class="bg-transparent border-none focus:outline-none text-sm w-full"
                 bind:value={filters.ip}
               />
@@ -193,150 +195,156 @@
         </div>
       </div>
 
-      <!-- Updated Mobile card view (shown on small screens) -->
-      <div class="md:hidden space-y-4">
-        {#each filteredDevices as device}
-          <div
-            class="card bg-base-100 shadow-md hover:shadow-lg transition-shadow duration-200 cursor-pointer"
-            on:click={() => openModal(device)}
-          >
-            <div class="card-body p-4">
-              <div class="space-y-1">
-                <!-- IP Addresses -->
-                {#if device.ipv4_addresses && device.ipv4_addresses.length > 0}
-                  <div class="flex items-center flex-wrap gap-1">
-                    <span class="badge badge-sm badge-primary">v4</span>
-                    <span class="font-medium truncate"
-                      >{device.ipv4_addresses[0]}</span
-                    >
-                    {#if device.ipv4_addresses.length > 1}
-                      <span class="badge badge-sm badge-ghost"
-                        >+{device.ipv4_addresses.length - 1}</span
+      {#if filteredDevices.length === 0}
+        <div class="bg-base-100 rounded-lg shadow p-4 mb-4">
+          <p class="text-base-content">No devices found.</p>
+        </div>
+      {:else}
+        <!-- Updated Mobile card view (shown on small screens) -->
+        <div class="md:hidden space-y-4">
+          {#each filteredDevices as device}
+            <div
+              class="card bg-base-100 shadow-md hover:shadow-lg transition-shadow duration-200 cursor-pointer"
+              on:click={() => openModal(device)}
+            >
+              <div class="card-body p-4">
+                <div class="space-y-1">
+                  <!-- IP Addresses -->
+                  {#if device.ipv4_addresses && device.ipv4_addresses.length > 0}
+                    <div class="flex items-center flex-wrap gap-1">
+                      <span class="badge badge-sm badge-primary">v4</span>
+                      <span class="font-medium truncate"
+                        >{device.ipv4_addresses[0]}</span
                       >
-                    {/if}
-                  </div>
-                {/if}
+                      {#if device.ipv4_addresses.length > 1}
+                        <span class="badge badge-sm badge-ghost"
+                          >+{device.ipv4_addresses.length - 1}</span
+                        >
+                      {/if}
+                    </div>
+                  {/if}
 
-                {#if device.ipv6_addresses && device.ipv6_addresses.length > 0}
-                  <div class="flex items-center flex-wrap gap-1">
-                    <span class="badge badge-sm badge-secondary">v6</span>
-                    <span
-                      class="font-medium truncate text-xs max-w-[260px]"
-                      title={device.ipv6_addresses[0]}
-                    >
-                      {device.ipv6_addresses[0]}
-                    </span>
-                    {#if device.ipv6_addresses.length > 1}
-                      <span class="badge badge-sm badge-ghost"
-                        >+{device.ipv6_addresses.length - 1}</span
+                  {#if device.ipv6_addresses && device.ipv6_addresses.length > 0}
+                    <div class="flex items-center flex-wrap gap-1">
+                      <span class="badge badge-sm badge-secondary">v6</span>
+                      <span
+                        class="font-medium truncate text-xs max-w-[260px]"
+                        title={device.ipv6_addresses[0]}
                       >
-                    {/if}
-                  </div>
-                {/if}
-              </div>
-
-              <div class="divider my-1"></div>
-
-              <!-- Replace grid with flex column layout -->
-              <div class="flex flex-col gap-2 text-sm">
-                <div>
-                  <div class="opacity-70">MAC Address</div>
-                  <div class="font-mono break-all">{device.mac || "N/A"}</div>
+                        {device.ipv6_addresses[0]}
+                      </span>
+                      {#if device.ipv6_addresses.length > 1}
+                        <span class="badge badge-sm badge-ghost"
+                          >+{device.ipv6_addresses.length - 1}</span
+                        >
+                      {/if}
+                    </div>
+                  {/if}
                 </div>
-                <div>
-                  <div class="opacity-70">Interface</div>
-                  <div class="break-all">{device.intf || "N/A"}</div>
-                </div>
-                {#if device.hostname}
+
+                <div class="divider my-1"></div>
+
+                <!-- Replace grid with flex column layout -->
+                <div class="flex flex-col gap-2 text-sm">
                   <div>
-                    <div class="opacity-70">Hostname</div>
-                    <div class="break-all">{device.hostname}</div>
+                    <div class="opacity-70">MAC Address</div>
+                    <div class="font-mono break-all">{device.mac || "N/A"}</div>
                   </div>
-                {/if}
+                  <div>
+                    <div class="opacity-70">Interface</div>
+                    <div class="break-all">{device.intf || "N/A"}</div>
+                  </div>
+                  {#if device.hostname}
+                    <div>
+                      <div class="opacity-70">Hostname</div>
+                      <div class="break-all">{device.hostname}</div>
+                    </div>
+                  {/if}
+                </div>
               </div>
             </div>
-          </div>
-        {/each}
-      </div>
+          {/each}
+        </div>
 
-      <!-- Desktop table view (hidden on mobile) -->
-      <div
-        class="hidden md:block overflow-x-auto bg-base-100 rounded-lg shadow"
-      >
-        <table class="table w-full">
-          <thead>
-            <tr>
-              <th>IP Address</th>
-              <th>MAC Address</th>
-              <th>Interface</th>
-              <th>Hostname</th>
-            </tr>
-          </thead>
-          <tbody>
-            {#each filteredDevices as device}
-              <tr
-                class="hover:bg-base-200 transition-colors duration-200 cursor-pointer"
-                on:click={() => openModal(device)}
-              >
-                <td class="py-4">
-                  <div class="space-y-1">
-                    <!-- IPv4 Addresses -->
-                    {#if device.ipv4_addresses && device.ipv4_addresses.length > 0}
-                      <!-- Only show the first IPv4 address in the table view -->
-                      <div class="flex items-center">
-                        <span class="badge badge-sm badge-primary mr-2">v4</span
-                        >
-                        {device.ipv4_addresses[0]}
-                        {#if device.ipv4_addresses.length > 1}
-                          <span class="badge badge-sm badge-ghost ml-2"
-                            >+{device.ipv4_addresses.length - 1}</span
-                          >
-                        {/if}
-                      </div>
-                    {/if}
-
-                    <!-- IPv6 Addresses - show first one only in table view -->
-                    {#if device.ipv6_addresses && device.ipv6_addresses.length > 0}
-                      <div class="flex items-center">
-                        <span class="badge badge-sm badge-secondary mr-2"
-                          >v6</span
-                        >
-                        <span
-                          class="text-xs truncate max-w-[200px]"
-                          title={device.ipv6_addresses[0]}
-                        >
-                          {device.ipv6_addresses[0]}
-                        </span>
-                        {#if device.ipv6_addresses.length > 1}
-                          <span class="badge badge-sm badge-ghost ml-2"
-                            >+{device.ipv6_addresses.length - 1}</span
-                          >
-                        {/if}
-                      </div>
-                    {/if}
-
-                    {#if (!device.ipv4_addresses || device.ipv4_addresses.length === 0) && (!device.ipv6_addresses || device.ipv6_addresses.length === 0)}
-                      <span class="opacity-50">No IP addresses</span>
-                    {/if}
-                  </div>
-                </td>
-                <td class="py-4 font-mono">
-                  {device.mac || "N/A"}
-                </td>
-                <td class="py-4">
-                  {device.intf || "N/A"}
-                  <div class="text-xs opacity-70">
-                    {device.intf_description || ""}
-                  </div>
-                </td>
-                <td class="py-4">
-                  {device.hostname || "Unknown"}
-                </td>
+        <!-- Desktop table view (hidden on mobile) -->
+        <div
+          class="hidden md:block overflow-x-auto bg-base-100 rounded-lg shadow"
+        >
+          <table class="table w-full">
+            <thead>
+              <tr>
+                <th>IP Address</th>
+                <th>MAC Address</th>
+                <th>Interface</th>
+                <th>Hostname</th>
               </tr>
-            {/each}
-          </tbody>
-        </table>
-      </div>
+            </thead>
+            <tbody>
+              {#each filteredDevices as device}
+                <tr
+                  class="hover:bg-base-200 transition-colors duration-200 cursor-pointer"
+                  on:click={() => openModal(device)}
+                >
+                  <td class="py-4">
+                    <div class="space-y-1">
+                      <!-- IPv4 Addresses -->
+                      {#if device.ipv4_addresses && device.ipv4_addresses.length > 0}
+                        <!-- Only show the first IPv4 address in the table view -->
+                        <div class="flex items-center">
+                          <span class="badge badge-sm badge-primary mr-2">v4</span
+                          >
+                          {device.ipv4_addresses[0]}
+                          {#if device.ipv4_addresses.length > 1}
+                            <span class="badge badge-sm badge-ghost ml-2"
+                              >+{device.ipv4_addresses.length - 1}</span
+                            >
+                          {/if}
+                        </div>
+                      {/if}
+
+                      <!-- IPv6 Addresses - show first one only in table view -->
+                      {#if device.ipv6_addresses && device.ipv6_addresses.length > 0}
+                        <div class="flex items-center">
+                          <span class="badge badge-sm badge-secondary mr-2"
+                            >v6</span
+                          >
+                          <span
+                            class="text-xs truncate max-w-[200px]"
+                            title={device.ipv6_addresses[0]}
+                          >
+                            {device.ipv6_addresses[0]}
+                          </span>
+                          {#if device.ipv6_addresses.length > 1}
+                            <span class="badge badge-sm badge-ghost ml-2"
+                              >+{device.ipv6_addresses.length - 1}</span
+                            >
+                          {/if}
+                        </div>
+                      {/if}
+
+                      {#if (!device.ipv4_addresses || device.ipv4_addresses.length === 0) && (!device.ipv6_addresses || device.ipv6_addresses.length === 0)}
+                        <span class="opacity-50">No IP addresses</span>
+                      {/if}
+                    </div>
+                  </td>
+                  <td class="py-4 font-mono">
+                    {device.mac || "N/A"}
+                  </td>
+                  <td class="py-4">
+                    {device.intf || "N/A"}
+                    <div class="text-xs opacity-70">
+                      {device.intf_description || ""}
+                    </div>
+                  </td>
+                  <td class="py-4">
+                    {device.hostname || "Unknown"}
+                  </td>
+                </tr>
+              {/each}
+            </tbody>
+          </table>
+        </div>
+      {/if}
     {/if}
   </div>
 
