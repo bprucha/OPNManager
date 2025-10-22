@@ -38,13 +38,15 @@ export interface Status {
     | 'biometryNotEnrolled'
 }
 
-interface EncryptCipherData {
+export interface EncryptCipherData {
   data: string,
 }
-interface DecryptCipherData {
+
+export interface DecryptCipherData {
   data: string,
   initializationVector: string,
 }
+
 export type CipherData = EncryptCipherData | DecryptCipherData;
 
 interface BaseAuthOptions {
@@ -56,19 +58,23 @@ interface BaseAuthOptions {
     confirmationRequired?: boolean;
     maxAttemps?: number;
 }
+
 interface PromptAuthOptions extends BaseAuthOptions {
     mode: AuthMode.PROMPT;
 }
+
 interface EncryptAuthOptions extends BaseAuthOptions {
     mode: AuthMode.ENCRYPT;
     cipherKey: string;
     cipherData: EncryptCipherData;
 }
+
 interface DecryptAuthOptions extends BaseAuthOptions {
     mode: AuthMode.DECRYPT;
     cipherKey: string;
     cipherData: DecryptCipherData;
 }
+
 export type AuthOptions = BaseAuthOptions | PromptAuthOptions | EncryptAuthOptions | DecryptAuthOptions;
 
 /**

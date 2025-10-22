@@ -15,10 +15,10 @@ export interface Status {
     error?: string;
     errorCode?: 'appCancel' | 'authenticationFailed' | 'invalidContext' | 'notInteractive' | 'passcodeNotSet' | 'systemCancel' | 'userCancel' | 'userFallback' | 'biometryLockout' | 'biometryNotAvailable' | 'biometryNotEnrolled';
 }
-interface EncryptCipherData {
+export interface EncryptCipherData {
     data: string;
 }
-interface DecryptCipherData {
+export interface DecryptCipherData {
     data: string;
     initializationVector: string;
 }
