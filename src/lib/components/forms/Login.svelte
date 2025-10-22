@@ -3,7 +3,7 @@
   import { invoke } from "@tauri-apps/api/core";
   import { LazyStore } from '@tauri-apps/plugin-store';
   import { toasts } from '$lib/stores/toastStore';
-  import { DecryptCipherData, authenticate, AuthMode } from '@tauri-apps/plugin-biometric';
+  import { authenticate, AuthMode, type EncryptedCipherData } from '@tauri-apps/plugin-biometric';
   import {
       mdiFingerprint,
   } from '@mdi/js';
@@ -25,7 +25,7 @@
   };
 
   const pinStore = new LazyStore('pin.json');
-  let encryptedPinData: DecryptCipherData | undefined = undefined;
+  let encryptedPinData: EncryptedCipherData | undefined = undefined;
   let isBiometricLoginEnabled = false;
   let isPinFallback = false;
   let pin = "";
@@ -37,7 +37,7 @@
   onMount(async () => {
     await loadProfiles();
 
-    encryptedPinData = await pinStore.get<DecryptCipherData>('encryptedPinData');
+    encryptedPinData = await pinStore.get<EncryptedCipherData>('encryptedPinData');
     isBiometricLoginEnabled = encryptedPinData != null;
   });
 

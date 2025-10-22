@@ -38,16 +38,16 @@ export interface Status {
     | 'biometryNotEnrolled'
 }
 
-export interface EncryptCipherData {
+export interface DecryptedCipherData {
   data: string,
 }
 
-export interface DecryptCipherData {
+export interface EncryptedCipherData {
   data: string,
   initializationVector: string,
 }
 
-export type CipherData = EncryptCipherData | DecryptCipherData;
+export type CipherData = DecryptedCipherData | EncryptedCipherData;
 
 interface BaseAuthOptions {
     allowDeviceCredential?: boolean;
@@ -66,13 +66,13 @@ interface PromptAuthOptions extends BaseAuthOptions {
 interface EncryptAuthOptions extends BaseAuthOptions {
     mode: AuthMode.ENCRYPT;
     cipherKey: string;
-    cipherData: EncryptCipherData;
+    cipherData: DecryptedCipherData;
 }
 
 interface DecryptAuthOptions extends BaseAuthOptions {
     mode: AuthMode.DECRYPT;
     cipherKey: string;
-    cipherData: DecryptCipherData;
+    cipherData: EncryptedCipherData;
 }
 
 export type AuthOptions = BaseAuthOptions | PromptAuthOptions | EncryptAuthOptions | DecryptAuthOptions;
