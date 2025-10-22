@@ -1,13 +1,23 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { invoke } from "@tauri-apps/api/core";
+  import { LazyStore } from '@tauri-apps/plugin-store';
   import { goto } from "$app/navigation";
   import AppLayout from '../AppLayout.svelte';
   import SettingsForm from '$lib/components/forms/SettingsForm.svelte';
   import Login from '$lib/components/forms/Login.svelte';
   import { toasts } from '$lib/stores/toastStore';
   import { authStore } from '$lib/stores/authStore';
+  import { checkStatus, authenticate, AuthMode, DecryptCipherData } from '@tauri-apps/plugin-biometric';
+  import SecureDialog from '$lib/components/SecureDialog.svelte';
+  import {
+      mdiFingerprint,
+  } from '@mdi/js';
 
+  let verifyPinDialog: SecureDialog;
+  let isBiometricLoginEnabled = false;
+  let isBiometricLoginSupported = false;
+  let isUpdatingBio = false;
   let apiKey = "";
   let apiSecret = "";
   let apiUrl = "";
@@ -19,13 +29,31 @@
   let activeTab: 'api' | 'pin' = 'api';
   let isFirstRun = false;
   let isUpdatingPin = false;
-  
+
+  const pinStore = new LazyStore('pin.json');
+  let encryptedPinData: DecryptCipherData | undefined = undefined;
 
   onMount(async () => {
     if ($authStore.isLoggedIn) {
       await loadApiInfo();
     }
     isFirstRun = await invoke<boolean>("check_first_run");
+
+    encryptedPinData = await pinStore.get<DecryptCipherData>('encryptedPinData');
+    isBiometricLoginEnabled = encryptedPinData != null;
+
+    if(import.meta.env.TAURI_ENV_PLATFORM === "android"
+      //|| import.meta.env.TAURI_ENV_PLATFORM === "ios")
+    ){
+      try {
+        const biometricStatus = await checkStatus();
+        if(biometricStatus.isAvailable) {
+          isBiometricLoginSupported = true;
+        }
+      } catch {
+
+      }
+    }
   });
 
   async function loadApiInfo() {
@@ -48,7 +76,7 @@
     }
   }
 
-  async function handleApiSubmit(event: CustomEvent<{profileName: string, apiKey: string, apiSecret: string, apiUrl: string, port: number, pin: string}>) {
+async function handleApiSubmit(event: CustomEvent<{profileName: string, apiKey: string, apiSecret: string, apiUrl: string, port: number, pin: string}>) {
   const { profileName, apiKey, apiSecret, apiUrl, port, pin } = event.detail;
   try {
     if (isFirstRun) {
@@ -159,6 +187,66 @@
     goto('/');
   }
 
+  async function toggleBiometricLogin(): Promise<void> {
+    // A basic call to backend Rust. The Biometric response hangs sometimes
+    // without another backend call to keep things going.
+    async function biometricRefresh() {
+      let isFirstRun = await invoke<boolean>("check_first_run");
+      if(isUpdatingBio) {
+        setTimeout(biometricRefresh, 1000)
+      }
+    }
+    try {
+      if(isBiometricLoginEnabled) {
+        pinStore.delete('encryptedPinData')
+        toasts.success("Biometric authentication disabled");
+        isBiometricLoginEnabled = false
+      } else {
+        const verifyPin = await verifyPinDialog.show(
+                      'Verify PIN',
+                      'Verify your PIN to enable Biometric Login.'
+                  )
+        if(verifyPin) {
+          isUpdatingBio = true;
+          biometricRefresh();
+          const pinVerified = await invoke("verify_pin", {pin: verifyPin});
+          if(pinVerified) {
+            try {
+              let encryptedPinData = await authenticate('Continue to enable Biometric Login', {
+                allowDeviceCredential: false,
+                cancelTitle: "Cancel",
+                fallbackTitle: 'Sorry, authentication failed',
+                title: 'OPNManager Authentication',
+                confirmationRequired: true,
+                mode: AuthMode.ENCRYPT,
+                cipherKey: "OPNManagerKey",
+                cipherData: {
+                  data: verifyPin,
+                },
+              });
+
+              await pinStore.set('encryptedPinData', encryptedPinData);
+              await pinStore.save();
+              isBiometricLoginEnabled = true
+
+              toasts.success("Biometric Login enabled");
+            } catch(error: any) {
+              if(error.code != 'userCancel') {
+                toasts.error(`Biometric authentication failed: ${error?.message}`);
+              }
+            }
+          } else {
+            toasts.error("PIN verification failed. Cannot enable Biometric Login.");
+          }
+        }
+      }
+    } catch(error) {
+      toasts.error(`Biometric authentication failed`);
+    } finally {
+      isUpdatingBio = false;
+    }
+  }
+
   function setActiveTab(tab: 'api' | 'pin') {
     activeTab = tab;
   }
@@ -194,7 +282,7 @@
             on:click={() => setActiveTab('pin')}
             disabled={isUpdatingPin}
           >
-            Change PIN
+            Security
           </button>
         </div>
       {/if}
@@ -287,6 +375,37 @@
             {/if}
           </form>
         </div>
+        {#if isBiometricLoginSupported || isBiometricLoginEnabled}
+          <div class="bg-base-100 p-6 rounded-lg shadow-lg mt-6">
+            <h3 class="text-xl font-semibold mb-4">Biometric Login</h3>
+            <SecureDialog bind:this={verifyPinDialog} />
+
+            <div class="flex items-center form-control">
+              <div class="size-14 shrink-0 items-center justify-center mr-4">
+                  <svg viewBox="0 0 24 24">
+                      <path fill="currentColor" d={mdiFingerprint} />
+                  </svg>
+              </div>
+              <button type="submit" class="btn btn-primary" disabled={isUpdatingBio || isUpdatingPin} on:click={toggleBiometricLogin}>
+                {#if isBiometricLoginEnabled}
+                  {#if isUpdatingBio}
+                    <span class="loading loading-spinner loading-sm mr-2"></span>
+                    Disabling
+                  {:else}
+                    Disable
+                  {/if}
+                {:else}
+                  {#if isUpdatingBio}
+                    <span class="loading loading-spinner loading-sm mr-2"></span>
+                    Enabling
+                  {:else}
+                    Enable
+                  {/if}
+                {/if}
+              </button>
+            </div>
+          </div>
+        {/if}
       {/if}
     </div>
   </AppLayout>
