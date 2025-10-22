@@ -8,7 +8,7 @@
   import Login from '$lib/components/forms/Login.svelte';
   import { toasts } from '$lib/stores/toastStore';
   import { authStore } from '$lib/stores/authStore';
-  import { checkStatus, authenticate, AuthMode, DecryptCipherData } from '@tauri-apps/plugin-biometric';
+  import { checkStatus, authenticate, AuthMode, type EncryptedCipherData } from '@tauri-apps/plugin-biometric';
   import SecureDialog from '$lib/components/SecureDialog.svelte';
   import {
       mdiFingerprint,
@@ -31,7 +31,7 @@
   let isUpdatingPin = false;
 
   const pinStore = new LazyStore('pin.json');
-  let encryptedPinData: DecryptCipherData | undefined = undefined;
+  let encryptedPinData: EncryptedCipherData | undefined = undefined;
 
   onMount(async () => {
     if ($authStore.isLoggedIn) {
