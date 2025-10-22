@@ -1,10 +1,33 @@
 <script lang="ts">
   import { createEventDispatcher, onMount } from 'svelte';
   import { invoke } from "@tauri-apps/api/core";
+  import { LazyStore } from '@tauri-apps/plugin-store';
   import { toasts } from '$lib/stores/toastStore';
+  import { DecryptCipherData, authenticate, AuthMode } from '@tauri-apps/plugin-biometric';
+  import {
+      mdiFingerprint,
+  } from '@mdi/js';
 
   const dispatch = createEventDispatcher();
 
+  const biometricOptions = {
+    // Set true if you want the user to be able to authenticate using phone password
+    allowDeviceCredential: false,
+    cancelTitle: "Feature won't work if Canceled",
+
+    // iOS only feature
+    fallbackTitle: 'Sorry, authentication failed',
+
+    // Android only features
+    title: 'OPNManager Authentication',
+    subtitle: 'Authenticate to login to OPNManager',
+    confirmationRequired: true,
+  };
+
+  const pinStore = new LazyStore('pin.json');
+  let encryptedPinData: DecryptCipherData | undefined = undefined;
+  let isBiometricLoginEnabled = false;
+  let isPinFallback = false;
   let pin = "";
   let isLoading = false;
   let loadingProfiles = true;
@@ -13,7 +36,44 @@
 
   onMount(async () => {
     await loadProfiles();
+
+    encryptedPinData = await pinStore.get<DecryptCipherData>('encryptedPinData');
+    isBiometricLoginEnabled = encryptedPinData != null;
   });
+
+  async function handleBiometricLogin(): Promise<void> {
+    // A basic call to backend Rust. The Biometric response hangs sometimes
+    // without another backend call to keep things going.
+    async function biometricRefresh() {
+      let isFirstRun = await invoke<boolean>("check_first_run");
+      if(isLoading) {
+        setTimeout(biometricRefresh, 1000)
+      }
+    }
+    try {
+      isLoading = true;
+      biometricRefresh();
+      let decryptedPinData = await authenticate('Biometric login enabled', {
+        allowDeviceCredential: false,
+        cancelTitle: "Cancel",
+        fallbackTitle: 'Sorry, authentication failed',
+        title: 'OPNManager Authentication',
+        confirmationRequired: true,
+        mode: AuthMode.DECRYPT,
+        cipherKey: "OPNManagerKey",
+        cipherData: encryptedPinData,
+      });
+      pin = decryptedPinData.data
+      await handlePinLogin()
+    } catch(error: any) {
+      isPinFallback = true;
+      if(error.code != 'userCancel') {
+        toasts.error(`Biometric authentication failed: ${error?.message}`);
+      }
+    } finally {
+      isLoading = false;
+    }
+  }
 
   async function loadProfiles(): Promise<void> {
     try {
@@ -46,7 +106,7 @@
     }
   }
 
-  async function handleSubmit() {
+  async function handlePinLogin() {
     if (!/^\d+$/.test(pin)) {
       toasts.error("PIN must contain only numbers.");
       return;
@@ -65,6 +125,14 @@
       toasts.error("An error occurred. Please try again.");
     } finally {
       isLoading = false;
+    }
+  }
+
+  async function handleSubmit() {
+    if(isBiometricLoginEnabled && !isPinFallback) {
+      await handleBiometricLogin();
+    } else {
+      await handlePinLogin();
     }
   }
 </script>
@@ -127,24 +195,25 @@
           {/if}
         </div>
         
-        <!-- PIN Input -->
-        <div class="card bg-base-200 p-3 rounded-lg">
-          <label for="pin" class="block text-sm font-medium mb-1">
-            Enter your PIN
-          </label>
-          <input 
-            id="pin"
-            bind:value={pin}
-            type="password"
-            inputmode="numeric"
-            pattern="\d*"
-            placeholder="••••"
-            class="input input-bordered w-full bg-base-100"
-            required
-            disabled={isLoading}
-          />
-        </div>
-        
+        {#if isPinFallback || !isBiometricLoginEnabled}
+          <!-- PIN Input -->
+          <div class="card bg-base-200 p-3 rounded-lg">
+            <label for="pin" class="block text-sm font-medium mb-1">
+              Enter your PIN
+            </label>
+            <input 
+              id="pin"
+              bind:value={pin}
+              type="password"
+              inputmode="numeric"
+              pattern="\d*"
+              placeholder="••••"
+              class="input input-bordered w-full bg-base-100"
+              required
+              disabled={isLoading}
+            />
+          </div>
+        {/if}
         <div>
           <button 
             type="submit" 
@@ -156,6 +225,15 @@
             {/if}
             Login
           </button>
+          {#if isBiometricLoginEnabled}
+            <div class="flex items-center justify-center">
+              <button class="mdi-icon size-14 shrink-0 m-4" on:click={handleBiometricLogin} disabled={isLoading}>
+                  <svg viewBox="0 0 24 24">
+                      <path fill="currentColor" d={mdiFingerprint} />
+                  </svg>
+                </button>
+            </div>
+          {/if}
         </div>
       </form>
     </div>
@@ -168,6 +246,13 @@
 </div>
 
 <style>
+  .mdi-icon:disabled {
+    opacity: 0.1;
+  }
+  .mdi-icon:active {
+    color: red;
+  }
+
   /* Custom styling for the login button */
   button[type="submit"] {
     transition: opacity 0.3s ease;
