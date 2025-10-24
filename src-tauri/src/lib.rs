@@ -26,8 +26,9 @@ use traffic::register_traffic_cache;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    let mut default_builder =
-        tauri::Builder::default().plugin(tauri_plugin_store::Builder::new().build());
+    let mut default_builder = tauri::Builder::default()
+        .plugin(tauri_plugin_http::init())
+        .plugin(tauri_plugin_store::Builder::new().build());
 
     #[cfg(any(target_os = "android", target_os = "ios"))]
     {

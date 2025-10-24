@@ -4,6 +4,8 @@ import { invoke } from "@tauri-apps/api/core";
 interface AuthState {
   isLoggedIn: boolean;
   isConfigured: boolean;
+  baseUrl: string;
+  authHeader: HeadersInit;
 }
 
 async function cleanupOnLogout() {
@@ -34,18 +36,34 @@ async function cleanupOnLogout() {
 function createAuthStore() {
   const { subscribe, set, update } = writable<AuthState>({
     isLoggedIn: false,
-    isConfigured: false
+    isConfigured: false,
+    baseUrl: '',
+    authHeader: {},
   });
 
   return {
     subscribe,
-    login: () => update(state => ({ ...state, isLoggedIn: true })),
+    login: async () => {
+      let apiInfo = await invoke<{
+        api_key: string;
+        api_secret: string;
+        api_url: string;
+        port: number;
+      }>("get_api_info");
+      
+      update(state => ({
+        ...state,
+        isLoggedIn: true,
+        baseUrl: apiInfo.api_url,
+        authHeader: {'Authorization': `Basic ${btoa(`${apiInfo.api_key}:${apiInfo.api_secret}`)}`}
+      }))
+    },
     logout: async () => {
       await cleanupOnLogout();
       update(state => ({ ...state, isLoggedIn: false }));
     },
     setConfigured: (value: boolean) => update(state => ({ ...state, isConfigured: value })),
-    reset: () => set({ isLoggedIn: false, isConfigured: false })
+    reset: () => set({ isLoggedIn: false, isConfigured: false, baseUrl: '', authHeader: {} })
   };
 }
 

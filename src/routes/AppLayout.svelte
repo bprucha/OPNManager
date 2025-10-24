@@ -62,8 +62,16 @@
       ],
     },
     { path: "/devices", icon: mdiRouter, label: "Devices" },
-    { path: "/rules", icon: mdiWallFire, label: "Firewall Rules" },
-    { path: "/logs", icon: mdiTextBoxSearch, label: "Firewall Logs" },
+    {
+      category: "firewall",
+      icon: mdiWallFire,
+      label: "Firewall",
+      items: [
+        { path: "/rules", icon: mdiWallFire, label: "Rules" },
+        { path: "/logs", icon: mdiTextBoxSearch, label: "Logs" },
+        { path: "/firewall-states", icon: mdiTextBoxSearch, label: "States" },
+      ],
+    },
     { path: "/alias", icon: mdiShieldSearch, label: "Alias" },
     {
       category: "unbound",
