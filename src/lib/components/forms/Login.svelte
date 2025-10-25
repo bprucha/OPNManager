@@ -223,17 +223,15 @@
             {#if isLoading}
               <span class="loading loading-spinner loading-sm mr-2"></span>
             {/if}
-            Login
-          </button>
-          {#if isBiometricLoginEnabled}
-            <div class="flex items-center justify-center">
-              <button class="mdi-icon size-14 shrink-0 m-4" on:click={handleBiometricLogin} disabled={isLoading}>
-                  <svg viewBox="0 0 24 24">
-                      <path fill="currentColor" d={mdiFingerprint} />
-                  </svg>
-                </button>
+            <div class="flex justify-center items-center h-full gap-2">
+              {#if isBiometricLoginEnabled}
+                <svg class="inline h-full w-auto" viewBox="0 0 24 24">
+                  <path fill="currentColor" d={mdiFingerprint} />
+                </svg>
+              {/if}
+              <p class="text-center">Login</p>
             </div>
-          {/if}
+          </button>
         </div>
       </form>
     </div>
