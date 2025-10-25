@@ -391,6 +391,21 @@
       </div>
     
     {:else if states.length > 0}
+      <!-- Batch actions (shown when search items found) -->
+      <div class="bg-base-200 p-2 rounded-md mb-3 flex items-center justify-between">
+        <span class="font-semibold">{total} item{total > 1 ? 's' : ''}{#if appliedSearchPhrase !== ''}&nbsp;matched{/if}</span>
+        {#if appliedSearchPhrase !== ''}
+          <div class="flex gap-2">
+            <button 
+              class="btn btn-sm btn-error" 
+              on:click={handleBatchDelete}
+            >
+              Kill all matched states
+            </button>
+          </div>
+        {/if}
+      </div>
+
       <!-- Mobile card view (shown on small screens) -->
       <div class="space-y-4">
         {#each states as state (state.id)}
