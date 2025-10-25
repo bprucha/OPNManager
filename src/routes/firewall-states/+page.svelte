@@ -33,21 +33,11 @@
   let total = 0;
   let currentPage = 1;
   let rowsPerPage = 25;
-  let searchPhrase = "";
   let appliedSearchPhrase = "";
-  let editModal = { isOpen: false, state: null };
-  let addModal = { isOpen: false };
-  let deleteModal = { isOpen: false, id: null as String | null };
-  let newTunable = { state: '', value: '', descr: '' };
-  let expandedRow: string | null = null; // Track which row is expanded on mobile
   let confirmKillMatchedStates: ConfirmDialog;
   let deviceChoice: HTMLSelectElement;
+  let deviceCustomChoice = false;
   
-  // Close any modals on page unload
-  onDestroy(() => {
-    editModal.isOpen = false;
-  });
-
   // Load firewall states
   async function loadStates() {
     loading = true;
@@ -66,6 +56,10 @@
           sort: {}
         })
       });
+      if(!response.ok) {
+        throw `Error ${response.status}: ${response.statusText}`
+      }
+
       let result = await response.json();
 
       states = result.rows || [];
@@ -106,8 +100,12 @@
         body: "{}"
       });
 
-      loadStates();
-      toasts.success(`State table has been reset.`);
+      if(response.ok) {
+        loadStates();
+        toasts.success(`State table has been reset.`);
+      } else {
+        toasts.error(`Error ${response.status}: ${response.statusText}`);
+      }
     }
   }
   
@@ -127,68 +125,33 @@
         body: "{}"
       });
 
-      loadStates();
-      toasts.success(`Source tracking has been reset.`);
+      if(response.ok) {
+        loadStates();
+        toasts.success(`Source tracking has been reset.`);
+      } else {
+        toasts.error(`Error ${response.status}: ${response.statusText}`);
+      }
     }
   }
 
-  // Close add modal
-  function closeAddModal() {
-    addModal.isOpen = false;
-  }
-  
-  // Open delete confirmation modal
-  function openDeleteModal(id: string) {
-    deleteModal = {
-      isOpen: true,
-      id,
-    };
-  }
-  
-  // Close delete confirmation modal
-  function closeDeleteModal() {
-    deleteModal = {
-      isOpen: false,
-      id: null,
-    };
-  }
-  
   // Handle deleting a state
-  async function handleDeleteState() {
-    if (!deleteModal.id) {
-      toasts.error("No state selected for deletion");
-      return;
-    }
-    
-    try {
-      console.log("Deleting state with ID:", deleteModal.id);
-      // const result = await invoke("delete_state", {
-      //   id: deleteModal.id
-      // });
-      
-      // console.log("Delete state result:", result);
-      
-      // if (result.result === "deleted") {
-      //   // Apply the changes immediately
-      //   const applyResult = await invoke("apply_states");
-      //   console.log("Apply result after delete:", applyResult);
-        
-      //   if (applyResult.status === "ok") {
-      //     toasts.success("Tunable deleted and changes applied successfully");
-      //   } else {
-      //     toasts.success("Tunable deleted but could not apply changes");
-      //   }
-        
-        closeDeleteModal();
-        
-        // Reload the states list
+  async function handleDeleteState(id: string) {
+    let confrimResult = await confirmKillMatchedStates.show("Confirm Delete State", "Select 'Confirm' to continue deleting the State or 'Cancel' to abort.", mdiTrashCan)
+    if(confrimResult) {
+      const response = await fetch(`${$authStore.baseUrl}/api/diagnostics/firewall/del_state/${id}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...$authStore.authHeader,
+        },
+        body: "{}"
+      });
+      if(response.ok) {
         loadStates();
-      // } else {
-      //   toasts.error("Failed to delete state");
-      // }
-    } catch (error) {
-      console.error("Failed to delete state:", error);
-      toasts.error(`Failed to delete state: ${error}`);
+        toasts.success(`The selected State has been delete.`);
+      } else {
+        toasts.error(`Error ${response.status}: ${response.statusText}`);
+      }
     }
   }
   
@@ -211,8 +174,12 @@
         })
       });
 
-      loadStates();
-      toasts.success(`States have been killed.`);
+      if(response.ok) {
+        loadStates();
+        toasts.success(`States have been killed.`);
+      } else {
+        toasts.error(`Error ${response.status}: ${response.statusText}`);
+      }
     }
   }
   
@@ -239,7 +206,8 @@
         duplicateItemsAllowed: false,
         searchEnabled: true,
         searchChoices: true,
-        addItems: false,
+        addItems: true,
+        addChoices: true,
         removeItemButton: true,
         placeholderValue: 'Select a device to search',
         callbackOnCreateTemplates: function(strToEl, escapeForTemplate, getClassNames) {
@@ -255,6 +223,28 @@
           }
         },
       });
+      deviceChoices.passedElement.element.addEventListener(
+        'addItem',
+        function(event) {
+          deviceCustomChoice = !devices.some(device => device.ipv4_addresses == event.detail.value || device.ipv6_addresses == event.detail.value);
+        },
+        false,
+      );
+      deviceChoices.passedElement.element.addEventListener(
+        'removeItem',
+        function(event) {
+          if(deviceCustomChoice) {
+            deviceChoices.removeChoice(event.detail.value);
+          }
+          // do something creative here...
+          console.log(event.detail.id);
+          console.log(event.detail.value);
+          console.log(event.detail.label);
+          console.log(event.detail.customProperties);
+          console.log(event.detail.groupValue);
+        },
+        false,
+      );
       deviceChoice.value = '';
 
       loadStates();
@@ -268,6 +258,18 @@
     } catch (error) {
       console.error("Failed to fetch devices:", error);
       toasts.error("Failed to fetch devices. Please try again.");
+    }
+  }
+
+  async function copyToClipboard(text: string) {
+    try {
+      await navigator.clipboard.writeText(text);
+      toasts.success("Copied to clipboard!");
+    } catch (err) {
+      console.error("Failed to copy: ", err);
+      toasts.error(
+        "Failed to copy text. Your browser may not support this feature.",
+      );
     }
   }
 </script>
@@ -317,25 +319,25 @@
     <!-- Actions and Search Bar -->
     <div class="mb-6 space-y-3">
       <div class="flex justify-start">
-        <div class="flex flex-grow">
-        <select bind:this={deviceChoice} id="searchFilter" on:change={() => {loadStates()}}>
-          {#each devices as device}
-            {#if device.hostname || device.ipv4_addresses || device.ipv6_addresses}
-              {#if device.ipv4_addresses}
-                <option value="{device.ipv4_addresses}">{device.ipv4_addresses}{#if device.hostname}&nbsp;({device.hostname}){/if}</option>
-              {/if}
-              <!-- {#if device.ipv6_addresses}
-                <option value="{device.ipv6_addresses}">{device.ipv6_addresses}{#if device.hostname}&nbsp;({device.hostname}){/if}</option>
-              {/if} -->
-            {/if}
-          {/each}
-        </select>
-        </div>
-        <button class="flex flex-initial items-center ml-2" aria-label="refresh" on:click={() => {fetchDevices(); loadStates();}}>
+        <button class="flex flex-initial items-center mr-2" aria-label="refresh" on:click={() => {fetchDevices(); loadStates();}}>
           <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="{mdiRefresh}" />
           </svg>
         </button>
+        <div class="flex flex-grow">
+          <select bind:this={deviceChoice} id="searchFilter" on:change={() => {loadStates()}}>
+            {#each devices as device}
+              {#if device.hostname || device.ipv4_addresses || device.ipv6_addresses}
+                {#if device.ipv4_addresses}
+                  <option value="{device.ipv4_addresses}">{device.ipv4_addresses}{#if device.hostname}&nbsp;({device.hostname}){/if}</option>
+                {/if}
+                {#if device.ipv6_addresses}
+                  <option value="{device.ipv6_addresses}">{device.ipv6_addresses}{#if device.hostname}&nbsp;({device.hostname}){/if}</option>
+                {/if}
+              {/if}
+            {/each}
+          </select>
+        </div>
       </div>
       
       <!-- Second row: Per page dropdown and Add button -->
@@ -349,33 +351,19 @@
           </select>
         </div>
         <div class="flex flex-grow flex-wrap justify-end gap-2">
-            <button class="btn btn-error" on:click={handleResetState}>
+            <button class="btn btn-sm btn-error" on:click={handleResetState}>
               <svg class="h-5 w-5 mr-1" viewBox="0 0 24 24">
                 <path fill="currentColor" d={mdiTrashCan} />
               </svg>
               Reset state table
             </button>
-            <button class="btn btn-error" on:click={handleResetSource}>
+            <button class="btn btn-sm btn-error" on:click={handleResetSource}>
               <svg class="h-5 w-5 mr-1" viewBox="0 0 24 24">
                 <path fill="currentColor" d={mdiTrashCan} />
               </svg>
               Reset source tracking
             </button>
         </div>
-          <!-- <div class="flex-wrap justify-self-end" style="border: 1px solid blue">
-            <button class="justify-self-end btn btn-primary m-2" on:click={openAddModal}>
-              <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-1" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M12 5v14M5 12h14"></path>
-              </svg>
-              Reset state table
-            </button>
-            <button class="justify-self-end btn btn-primary m-2" on:click={openAddModal}>
-              <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-1" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M12 5v14M5 12h14"></path>
-              </svg>
-              Reset source tracking
-            </button>
-          </div> -->
       </div>
     </div>
     
@@ -411,88 +399,67 @@
         </div>
       </div>
     
-    <!-- Tunables table for desktop view -->
     {:else if states.length > 0}
-      <!-- Batch actions toolbar (shown when items are selected) -->
-      
-      <div class="bg-base-200 p-2 rounded-md mb-3 flex items-center justify-between">
-        <span class="font-semibold">{total} item{total > 1 ? 's' : ''}{#if appliedSearchPhrase !== ''}&nbsp;matched{/if}</span>
-        {#if appliedSearchPhrase !== ''}
-          <div class="flex gap-2">
-            <button 
-              class="btn btn-sm btn-error" 
-              on:click={handleBatchDelete}
-            >
-              Kill all matched states
-            </button>
-          </div>
-        {/if}
-      </div>
-
-      <!-- Desktop table view (hidden on mobile) -->
-      <div class="hidden md:block overflow-x-auto bg-base-100 rounded-lg shadow">
-        <table class="table table-zebra w-full">
-          <thead>
-            <tr>
-              <th>Tunable Name</th>
-              <th>Type</th>
-              <th>Value</th>
-              <th>Default</th>
-              <th class="hidden lg:table-cell">Description</th>
-              <th class="w-24">Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {#each states as state (state.id)}
-              <tr>
-                <td class="font-mono text-xs md:text-sm max-w-[200px] truncate">
-                  <span title={state.state}>{state.state}</span>
-                </td>
-                <td>runtime</td>
-                <td class="font-mono text-xs md:text-sm max-w-[120px] truncate">
-                  <span title={state.value}>{state.value}</span>
-                </td>
-                <td class="font-mono text-xs md:text-sm max-w-[120px] truncate">
-                  <span title={state.default_value || state.value}>{state.default_value || state.value}</span>
-                </td>
-                <td class="hidden lg:table-cell text-xs md:text-sm max-w-[200px] truncate">
-                  <span title={state.descr || '-'}>{state.descr || '-'}</span>
-                </td>
-                <td>
-                  <div class="flex gap-1">
-                    <button
-                      class="btn btn-sm btn-ghost btn-square"
-                      title="Delete"
-                      on:click={() => openDeleteModal(state.id)}
-                    >
-                      <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <path d="M3 6h18"></path>
-                        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-                      </svg>
-                    </button>
-                  </div>
-                </td>
-              </tr>
-            {/each}
-          </tbody>
-        </table>
-      </div>
-      
       <!-- Mobile card view (shown on small screens) -->
-      <div class="md:hidden space-y-4">
+      <div class="space-y-4">
         {#each states as state (state.id)}
           <div class="card bg-base-100 shadow-md hover:shadow-lg transition-shadow">
             <div class="card-body p-4">
               <div class="flex flex-col">
                 <div class="contents font-mono text-xs font-medium truncate mb-2">
-                  <p class="contents text-purple-500">SRC:</p> {state.src_addr}:{state.src_port}
+                  <span>
+                    <p class="contents text-green-500">SRC:</p> {state.src_addr}:{state.src_port}
+                    <button
+                      class="inline-flex btn btn-xs btn-ghost"
+                      on:click|stopPropagation={() => copyToClipboard(state.src_addr)}
+                      title="Copy IPv4 address"
+                      aria-label="Copy IPv4 address"
+                    >
+                      <svg class="w-4 h-4" viewBox="0 0 24 24">
+                        <path
+                          fill="currentColor"
+                          d="M19,21H8V7H19M19,5H8A2,2 0 0,0 6,7V21A2,2 0 0,0 8,23H19A2,2 0 0,0 21,21V7A2,2 0 0,0 19,5M16,1H4A2,2 0 0,0 2,3V17H4V3H16V1Z"
+                        />
+                      </svg>
+                    </button>
+                  </span>
                 </div>
                 <div class="contents font-mono text-xs font-medium truncate mb-2">
-                  <p class="contents text-purple-500">DST:</p> {state.dst_addr}:{state.dst_port}
+                  <span>
+                    <p class="contents text-green-500">DST:</p> {state.dst_addr}:{state.dst_port}
+                    <button
+                      class="inline-flex btn btn-xs btn-ghost"
+                      on:click|stopPropagation={() => copyToClipboard(state.dst_addr)}
+                      title="Copy IPv4 address"
+                      aria-label="Copy IPv4 address"
+                    >
+                      <svg class="w-4 h-4" viewBox="0 0 24 24">
+                        <path
+                          fill="currentColor"
+                          d="M19,21H8V7H19M19,5H8A2,2 0 0,0 6,7V21A2,2 0 0,0 8,23H19A2,2 0 0,0 21,21V7A2,2 0 0,0 19,5M16,1H4A2,2 0 0,0 2,3V17H4V3H16V1Z"
+                        />
+                      </svg>
+                    </button>
+                  </span>
                 </div>
                 {#if state.nat_addr}
                   <div class="contents font-mono text-xs font-medium truncate mb-2">
-                    <p class="contents text-purple-500">NAT:</p> {state.nat_addr}:{state.nat_port}
+                    <span>
+                      <p class="contents text-green-500">NAT:</p> {state.nat_addr}:{state.nat_port}
+                      <button
+                        class="inline-flex btn btn-xs btn-ghost"
+                        on:click|stopPropagation={() => copyToClipboard(state.nat_addr)}
+                        title="Copy IPv4 address"
+                        aria-label="Copy IPv4 address"
+                      >
+                        <svg class="w-4 h-4" viewBox="0 0 24 24">
+                          <path
+                            fill="currentColor"
+                            d="M19,21H8V7H19M19,5H8A2,2 0 0,0 6,7V21A2,2 0 0,0 8,23H19A2,2 0 0,0 21,21V7A2,2 0 0,0 19,5M16,1H4A2,2 0 0,0 2,3V17H4V3H16V1Z"
+                          />
+                        </svg>
+                      </button>
+                    </span>
                   </div>
                 {/if}
                 
@@ -530,7 +497,7 @@
                 <div class="card-actions justify-end mt-3">
                   <button 
                     class="btn btn-sm btn-error" 
-                    on:click={() => openDeleteModal(state.id)}
+                    on:click={() => handleDeleteState(state.id)}
                   >
                     Delete
                   </button>
