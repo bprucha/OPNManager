@@ -95,6 +95,9 @@ async function handleApiSubmit(event: CustomEvent<{profileName: string, apiKey: 
         port: Number(port),
         isDefault: true
       });
+
+      // Load the new apiInfo into the authStore
+      await authStore.login();
       
       // Clear the traffic cache after updating API info
       await invoke("clear_traffic_cache");

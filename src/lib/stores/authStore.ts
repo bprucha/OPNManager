@@ -54,7 +54,11 @@ function createAuthStore() {
       update(state => ({
         ...state,
         isLoggedIn: true,
-        baseUrl: apiInfo.api_url,
+        baseUrl: apiInfo.api_url + (
+          (
+            (apiInfo.api_url.startsWith('http:') && apiInfo.port == 80) ||
+            (apiInfo.api_url.startsWith('https:') && apiInfo.port == 443))
+          ? '' : `:${apiInfo.port}`),
         authHeader: {'Authorization': `Basic ${btoa(`${apiInfo.api_key}:${apiInfo.api_secret}`)}`}
       }))
     },
