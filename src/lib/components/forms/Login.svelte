@@ -224,7 +224,7 @@
               <span class="loading loading-spinner loading-sm mr-2"></span>
             {/if}
             <div class="flex justify-center items-center h-full gap-2">
-              {#if isBiometricLoginEnabled}
+              {#if isBiometricLoginEnabled && !isPinFallback}
                 <svg class="inline h-full w-auto" viewBox="0 0 24 24">
                   <path fill="currentColor" d={mdiFingerprint} />
                 </svg>
