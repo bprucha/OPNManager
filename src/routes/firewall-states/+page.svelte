@@ -210,17 +210,8 @@
         addChoices: true,
         removeItemButton: true,
         placeholderValue: 'Select a device to search',
-        callbackOnCreateTemplates: function(strToEl, escapeForTemplate, getClassNames) {
-          return {
-            item: (
-              options: any,
-              choice: any,
-              removeItemButton: boolean,
-            ) => {
-              let template = Choices.defaults.templates.item(options, choice, removeItemButton);
-              return template;
-            },
-          }
+        addItemText: (value, rawValue) => {
+          return `Press Enter to search <b>"${value}"</b>`;
         },
       });
       deviceChoices.passedElement.element.addEventListener(
