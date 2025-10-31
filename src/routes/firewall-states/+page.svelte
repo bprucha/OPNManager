@@ -238,7 +238,7 @@
       );
       deviceChoice.value = '';
 
-      loadStates();
+      await loadStates();
       loading = false;
     }
   });
