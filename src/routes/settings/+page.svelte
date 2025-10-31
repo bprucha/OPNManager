@@ -153,11 +153,15 @@ async function handleApiSubmit(event: CustomEvent<{profileName: string, apiKey: 
             confirmNewPin 
           });
           
+          if(isBiometricLoginEnabled) {
+            await encryptAndSavePin(newPin);
+          }
+          
           // Clear form values
           currentPin = "";
           newPin = "";
           confirmNewPin = "";
-          
+
           toasts.success("PIN updated successfully! Please log in with your new PIN.");
           
           // Give the UI time to show the success message
@@ -205,39 +209,16 @@ async function handleApiSubmit(event: CustomEvent<{profileName: string, apiKey: 
         toasts.success("Biometric authentication disabled");
         isBiometricLoginEnabled = false
       } else {
-        const verifyPin = await verifyPinDialog.show(
+        const pinToVerify = await verifyPinDialog.show(
                       'Verify PIN',
                       'Verify your PIN to enable Biometric Login.'
                   )
-        if(verifyPin) {
+        if(pinToVerify) {
           isUpdatingBio = true;
           biometricRefresh();
-          const pinVerified = await invoke("verify_pin", {pin: verifyPin});
+          const pinVerified = await invoke("verify_pin", {pin: pinToVerify});
           if(pinVerified) {
-            try {
-              let encryptedPinData = await authenticate('Continue to enable Biometric Login', {
-                allowDeviceCredential: false,
-                cancelTitle: "Cancel",
-                fallbackTitle: 'Sorry, authentication failed',
-                title: 'OPNManager Authentication',
-                confirmationRequired: true,
-                mode: AuthMode.ENCRYPT,
-                cipherKey: "OPNManagerKey",
-                cipherData: {
-                  data: verifyPin,
-                },
-              });
-
-              await pinStore.set('encryptedPinData', encryptedPinData);
-              await pinStore.save();
-              isBiometricLoginEnabled = true
-
-              toasts.success("Biometric Login enabled");
-            } catch(error: any) {
-              if(error.code != 'userCancel') {
-                toasts.error(`Biometric authentication failed: ${error?.message}`);
-              }
-            }
+            await encryptAndSavePin(pinToVerify);
           } else {
             toasts.error("PIN verification failed. Cannot enable Biometric Login.");
           }
@@ -247,6 +228,35 @@ async function handleApiSubmit(event: CustomEvent<{profileName: string, apiKey: 
       toasts.error(`Biometric authentication failed`);
     } finally {
       isUpdatingBio = false;
+    }
+  }
+
+  async function encryptAndSavePin(pin: string): Promise<void> {
+    try {
+      let encryptedPinData = await authenticate('Continue to enable Biometric Login', {
+        allowDeviceCredential: false,
+        cancelTitle: "Cancel",
+        fallbackTitle: 'Sorry, authentication failed',
+        title: 'OPNManager Authentication',
+        confirmationRequired: true,
+        mode: AuthMode.ENCRYPT,
+        cipherKey: "OPNManagerKey",
+        cipherData: {
+          data: pin,
+        },
+      });
+
+      await pinStore.set('encryptedPinData', encryptedPinData);
+      await pinStore.save();
+      isBiometricLoginEnabled = true;
+
+      toasts.success("Biometric Login enabled");
+    } catch(error: any) {
+      await pinStore.delete('encryptedPinData');
+      isBiometricLoginEnabled = false;
+      if(error.code != 'userCancel') {
+        toasts.error(`Biometric authentication failed: ${error?.message}`);
+      }
     }
   }
 
